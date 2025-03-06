@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# Functionality: Prepends type and ticket name to the commit msg e.g feat(TKT-123): <commit message>
+# Functionality: Prepends type and ticket name to the commit msg e.g feat(TKT-123): <commit message>.
+# It also supports overriding type by giving one in the commit msg e.g chore: <commit message> -> chore(TK-123): <commit message>
 
 # Path to the commit message file
 COMMIT_MSG_FILE=$1
@@ -8,26 +9,37 @@ COMMIT_MSG_FILE=$1
 # Get the current branch name
 BRANCH_NAME=$(git symbolic-ref --short HEAD)
 
+# Read the existing commit message
+COMMIT_MSG=$(cat $COMMIT_MSG_FILE)
+
 # Extract the feature type and ticket number from branch name
 if [[ $BRANCH_NAME =~ ^([^/]+)/([A-Z]+-[0-9]+) ]]; then
-    FEATURE_TYPE="${BASH_REMATCH[1]}"
+    BRANCH_FEATURE_TYPE="${BASH_REMATCH[1]}"
     TICKET_NUMBER="${BASH_REMATCH[2]}"
     
-    # Read the existing commit message
-    COMMIT_MSG=$(cat $COMMIT_MSG_FILE)
-    
-    # Skip if the commit message already starts with the desired format
-    if [[ $COMMIT_MSG =~ ^$FEATURE_TYPE\($TICKET_NUMBER\): ]]; then
+    # Check if the commit message already contains the ticket number
+    if [[ $COMMIT_MSG =~ \($TICKET_NUMBER\): ]]; then
+        # If it already has the ticket number, don't modify it
         exit 0
     fi
     
-    # Create the new formatted prefix
-    NEW_PREFIX="$FEATURE_TYPE($TICKET_NUMBER): "
+    # Check if the commit message follows conventional commit format
+    if [[ $COMMIT_MSG =~ ^([a-z]+):\ (.*)$ ]]; then
+        # Extract the type and content
+        EXISTING_TYPE="${BASH_REMATCH[1]}"
+        COMMIT_CONTENT="${BASH_REMATCH[2]}"
+        
+        # Use the existing type but add ticket number
+        NEW_MSG="$EXISTING_TYPE($TICKET_NUMBER): $COMMIT_CONTENT"
+    else
+        # Use the branch feature type
+        NEW_MSG="$BRANCH_FEATURE_TYPE($TICKET_NUMBER): $COMMIT_MSG"
+    fi
     
-    # Prepend the prefix to the commit message
-    echo "$NEW_PREFIX$COMMIT_MSG" > $COMMIT_MSG_FILE
-    
-    echo "Commit message updated with prefix: $NEW_PREFIX"
+    # Write the new commit message
+    echo "$NEW_MSG" > $COMMIT_MSG_FILE
+    echo "Commit message updated to: $NEW_MSG"
 fi
 
 exit 0
+
